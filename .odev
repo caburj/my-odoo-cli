@@ -1,0 +1,6 @@
+[DEFAULT]
+conda-env = master
+odoo-src = ~/Projects/odoo-dev/src
+worktree-src = ~/Project/odoo-dev/worktrees
+default-dbname = testdb
+default-port = 8070
