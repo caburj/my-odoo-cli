@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from configparser import ConfigParser
+import json
 
 from .options import OptionEatAll
 
@@ -44,6 +45,9 @@ def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
         if env_python_exe.is_file()
         else HOME / "miniconda3" / "bin" / "python"
     )
+    config["workspace-dir"] = Path(
+        raw_config["DEFAULT"].get("workspace-dir")
+    ).expanduser()
     config["odoo-src"] = Path(raw_config["DEFAULT"].get("odoo-src")).expanduser()
     config["worktree-src"] = Path(
         raw_config["DEFAULT"].get("worktree-src")
@@ -62,17 +66,20 @@ def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
         else worktree_src / "enterprise" / enterprise_branch
     )
 
-    if not odoo_dir.exists():
-        create_odoo_worktree(config, odoo_branch, odoo_dir)
-    if not enterprise_dir.exists():
-        create_enterprise_worktree(config, enterprise_branch, enterprise_dir)
-
     config["addons-path"] = [
         str(src / "design-themes"),
         str(enterprise_dir),
         str(odoo_dir / "addons"),
         str(odoo_dir / "odoo" / "addons"),
     ]
+
+    if not odoo_dir.exists():
+        create_odoo_worktree(config, odoo_branch, odoo_dir)
+        create_odoo_workspace(config, odoo_branch)
+        create_launch_json(config, odoo_branch)
+    if not enterprise_dir.exists():
+        create_enterprise_worktree(config, enterprise_branch, enterprise_dir)
+        create_enterprise_workspace(config, enterprise_branch)
 
     ctx.obj["dbname"] = raw_config["DEFAULT"].get("default-dbname", dbname)
     ctx.obj["port"] = raw_config["DEFAULT"].get("default-port", port)
@@ -291,8 +298,17 @@ def delete_odoo_worktree_and_branch(config, branch):
     remove_dir_command = ["rm", "-rf", str(worktree_src / "odoo" / branch)]
     delete_branch_command = ["git", "branch", "-d", branch]
     prune_worktree_command = ["git", "worktree", "prune"]
+    delete_workspace_command = [
+        "rm",
+        str(config["workspace-dir"] / f"odoo-{branch}.code-workspace"),
+    ]
     os.chdir(odoo_dir)
-    for command in [remove_dir_command, delete_branch_command, prune_worktree_command]:
+    for command in [
+        remove_dir_command,
+        delete_branch_command,
+        prune_worktree_command,
+        delete_workspace_command,
+    ]:
         out, err = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ).communicate()
@@ -302,6 +318,7 @@ def delete_odoo_worktree_and_branch(config, branch):
             click.echo(err.decode("utf-8"), err=True)
     os.chdir(current_dir)
 
+
 def delete_enterprise_worktree_and_branch(config, branch):
     enterprise_dir = config["odoo-src"] / "enterprise"
     worktree_src = config["worktree-src"]
@@ -309,8 +326,17 @@ def delete_enterprise_worktree_and_branch(config, branch):
     remove_dir_command = ["rm", "-rf", str(worktree_src / "enterprise" / branch)]
     delete_branch_command = ["git", "branch", "-d", branch]
     prune_worktree_command = ["git", "worktree", "prune"]
+    delete_workspace_command = [
+        "rm",
+        str(config["workspace-dir"] / f"enterprise-{branch}.code-workspace"),
+    ]
     os.chdir(enterprise_dir)
-    for command in [remove_dir_command, delete_branch_command, prune_worktree_command]:
+    for command in [
+        remove_dir_command,
+        delete_branch_command,
+        prune_worktree_command,
+        delete_workspace_command,
+    ]:
         out, err = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ).communicate()
@@ -319,3 +345,66 @@ def delete_enterprise_worktree_and_branch(config, branch):
         if err:
             click.echo(err.decode("utf-8"), err=True)
     os.chdir(current_dir)
+
+
+def create_odoo_workspace(config, branch):
+    workspace = {
+        "folders": [
+            {"path": str(config["worktree-src"] / "odoo" / branch)},
+            {"path": "/home/joseph/Projects/odoo-dev/src/enterprise"},
+            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
+        ]
+    }
+    workspace_dir = config["workspace-dir"]
+    if not workspace_dir.exists():
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+    with open(workspace_dir / f"odoo-{branch}.code-workspace", "w+") as f:
+        json.dump(workspace, f, indent=4)
+
+
+def create_enterprise_workspace(config, branch):
+    workspace = {
+        "folders": [
+            {"path": "/home/joseph/Projects/odoo-dev/src/odoo"},
+            {"path": str(config["worktree-src"] / "enterprise" / branch)},
+            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
+        ]
+    }
+    workspace_dir = config["workspace-dir"]
+    if not workspace_dir.exists():
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+    with open(workspace_dir / f"enterprise-{branch}.code-workspace", "w+") as f:
+        json.dump(workspace, f)
+
+
+def create_launch_json(config, branch):
+    python = config["python"]
+    odoobin = config["odoo-bin"]
+    addons = config["addons-path"]
+    command = (
+        [python, odoobin]
+        + [f"--addons-path={','.join(addons)}"]
+        + ["-d", "testdb"]
+        + ["--xmlrpc-port", "8070"]
+    )
+    launch = {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "odoo-bin",
+                "type": "python",
+                "request": "launch",
+                "program": "${workspaceFolder}/odoo-bin",
+                "console": "integratedTerminal",
+                "args": command,
+            }
+        ],
+    }
+
+    vscode_dir = config["worktree-src"] / "odoo" / branch / ".vscode"
+    if not vscode_dir.exists():
+        vscode_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(vscode_dir / f"launch.json", "w+") as f:
+        json.dump(launch, f, indent=4)
+

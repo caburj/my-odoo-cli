@@ -4,4 +4,4 @@
 * [X] ~~*worktree interaction*~~ [2019-06-10]
     - checkout to worktree
     - use worktree as working dir
-* [ ] create workspace after new worktree
+* [X] ~~*create workspace after new worktree*~~ [2019-06-10]
