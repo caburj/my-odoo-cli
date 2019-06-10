@@ -1,8 +1,0 @@
-README.md
-setup.py
-odev.egg-info/PKG-INFO
-odev.egg-info/SOURCES.txt
-odev.egg-info/dependency_links.txt
-odev.egg-info/entry_points.txt
-odev.egg-info/requires.txt
-odev.egg-info/top_level.txt
