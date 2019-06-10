@@ -14,8 +14,10 @@ HOME = Path("~").expanduser()
 @click.group()
 @click.option("-d", "--dbname", default="testdb", show_default=True)
 @click.option("-p", "--port", default="8070")
+@click.option("-ob", "--odoo-branch", default="master")
+@click.option("-eb", "--enterprise-branch", default="master")
 @click.pass_context
-def cli(ctx, dbname, port):
+def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
     """
     My personal odoo dev commands in the terminal.
     """
@@ -47,12 +49,29 @@ def cli(ctx, dbname, port):
         raw_config["DEFAULT"].get("worktree-src")
     ).expanduser()
     config["odoo-bin"] = str(config["odoo-src"] / "odoo" / "odoo-bin")
+    config["odoo-branch"] = odoo_branch
+    config["enterprise-branch"] = enterprise_branch
     src = config["odoo-src"]
+    worktree_src = config["worktree-src"]
+    odoo_dir = (
+        src / "odoo" if odoo_branch == "master" else worktree_src / "odoo" / odoo_branch
+    )
+    enterprise_dir = (
+        src / "enterprise"
+        if enterprise_branch == "master"
+        else worktree_src / "enterprise" / enterprise_branch
+    )
+
+    if not odoo_dir.exists():
+        create_odoo_worktree(config, odoo_branch, odoo_dir)
+    if not enterprise_dir.exists():
+        create_enterprise_worktree(config, enterprise_branch, enterprise_dir)
+
     config["addons-path"] = [
         str(src / "design-themes"),
-        str(src / "enterprise"),
-        str(src / "odoo" / "addons"),
-        str(src / "odoo" / "odoo" / "addons"),
+        str(enterprise_dir),
+        str(odoo_dir / "addons"),
+        str(odoo_dir / "odoo" / "addons"),
     ]
 
     ctx.obj["dbname"] = raw_config["DEFAULT"].get("default-dbname", dbname)
@@ -138,6 +157,35 @@ def copy_db(obj, new_dbname):
         odooproc.kill()
 
 
+@cli.command("delete-branch")
+@click.option("-b", "--branches", type=list, cls=OptionEatAll)
+@click.pass_obj
+def delete_branch(obj, branches):
+    """ branches = list "odoo/<branch_name>" or "enterprise/<branch_name>"
+    """
+    if branches:
+        branches = [b.split("/") for b in branches]
+        odoo_branches = [b for a, b in branches if a == "odoo"]
+        enterprise_branches = [b for a, b in branches if a == "enterprise"]
+    else:
+        branches = []
+        odoo_branches = []
+        enterprise_branches = []
+    if obj["config"].get("odoo-branch") != "master":
+        odoo_branches.append(obj["config"].get("odoo-branch"))
+    if obj["config"].get("enterprise-branch") != "master":
+        enterprise_branches.append(obj["config"].get("enterprise-branch"))
+
+    for branch in odoo_branches:
+        delete_odoo_worktree_and_branch(obj["config"], branch)
+
+    for branch in enterprise_branches:
+        delete_enterprise_worktree_and_branch(obj["config"], branch)
+
+
+# UTILITY FUNCTIONS
+
+
 def init_db_command(config, dbname, init, no_demo, port):
     python = config["python"]
     odoobin = config["odoo-bin"]
@@ -188,3 +236,86 @@ def dropdb_command(dbname):
 def copydb_command(olddbname, newdbname):
     command = ["createdb", "-O", os.environ.get("USER"), "-T", olddbname, newdbname]
     return command
+
+
+def create_odoo_worktree(config, branch_name, directory):
+    odoo_dir = config["odoo-src"] / "odoo"
+    worktree_src = config["worktree-src"]
+    current_dir = os.getcwd()
+    os.chdir(odoo_dir.expanduser())
+    create_worktree_command = [
+        "git",
+        "worktree",
+        "add",
+        "-b",
+        branch_name,
+        str(worktree_src / "odoo" / branch_name),
+    ]
+    out, err = subprocess.Popen(
+        create_worktree_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if out:
+        click.echo(out.decode("utf-8"))
+    if err:
+        click.echo(err.decode("utf-8"), err=True)
+    os.chdir(current_dir)
+
+
+def create_enterprise_worktree(config, branch_name, directory):
+    enterprise_dir = config["odoo-src"] / "enterprise"
+    worktree_src = config["worktree-src"]
+    current_dir = os.getcwd()
+    os.chdir(enterprise_dir.expanduser())
+    create_worktree_command = [
+        "git",
+        "worktree",
+        "add",
+        "-b",
+        branch_name,
+        str(worktree_src / "enterprise" / branch_name),
+    ]
+    out, err = subprocess.Popen(
+        create_worktree_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if out:
+        click.echo(out.decode("utf-8"))
+    if err:
+        click.echo(err.decode("utf-8"), err=True)
+    os.chdir(current_dir)
+
+
+def delete_odoo_worktree_and_branch(config, branch):
+    odoo_dir = config["odoo-src"] / "odoo"
+    worktree_src = config["worktree-src"]
+    current_dir = os.getcwd()
+    remove_dir_command = ["rm", "-rf", str(worktree_src / "odoo" / branch)]
+    delete_branch_command = ["git", "branch", "-d", branch]
+    prune_worktree_command = ["git", "worktree", "prune"]
+    os.chdir(odoo_dir)
+    for command in [remove_dir_command, delete_branch_command, prune_worktree_command]:
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
+        if out:
+            click.echo(out.decode("utf-8"))
+        if err:
+            click.echo(err.decode("utf-8"), err=True)
+    os.chdir(current_dir)
+
+def delete_enterprise_worktree_and_branch(config, branch):
+    enterprise_dir = config["odoo-src"] / "enterprise"
+    worktree_src = config["worktree-src"]
+    current_dir = os.getcwd()
+    remove_dir_command = ["rm", "-rf", str(worktree_src / "enterprise" / branch)]
+    delete_branch_command = ["git", "branch", "-d", branch]
+    prune_worktree_command = ["git", "worktree", "prune"]
+    os.chdir(enterprise_dir)
+    for command in [remove_dir_command, delete_branch_command, prune_worktree_command]:
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
+        if out:
+            click.echo(out.decode("utf-8"))
+        if err:
+            click.echo(err.decode("utf-8"), err=True)
+    os.chdir(current_dir)
