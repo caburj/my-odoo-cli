@@ -52,7 +52,6 @@ def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
     config["worktree-src"] = Path(
         raw_config["DEFAULT"].get("worktree-src")
     ).expanduser()
-    config["odoo-bin"] = str(config["odoo-src"] / "odoo" / "odoo-bin")
     config["odoo-branch"] = odoo_branch
     config["enterprise-branch"] = enterprise_branch
     src = config["odoo-src"]
@@ -65,6 +64,7 @@ def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
         if enterprise_branch == "master"
         else worktree_src / "enterprise" / enterprise_branch
     )
+    config["odoo-bin"] = str((config["odoo-src"] / "odoo" if odoo_branch == 'master' else odoo_dir) / "odoo-bin")
 
     config["addons-path"] = [
         str(src / "design-themes"),
@@ -382,8 +382,7 @@ def create_launch_json(config, branch):
     odoobin = config["odoo-bin"]
     addons = config["addons-path"]
     command = (
-        [python, odoobin]
-        + [f"--addons-path={','.join(addons)}"]
+        [f"--addons-path={','.join(addons)}"]
         + ["-d", "testdb"]
         + ["--xmlrpc-port", "8070"]
     )
