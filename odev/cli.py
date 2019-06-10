@@ -142,7 +142,7 @@ def run_odoo_shell(obj, whatever):
         odooproc.kill()
 
 
-@cli.command("copy")
+@cli.command("copy-db")
 @click.argument("new-dbname")
 @click.pass_obj
 def copy_db(obj, new_dbname):
@@ -168,8 +168,7 @@ def copy_db(obj, new_dbname):
 @click.option("-b", "--branches", type=list, cls=OptionEatAll)
 @click.pass_obj
 def delete_branch(obj, branches):
-    """ branches = list "odoo/<branch_name>" or "enterprise/<branch_name>"
-    """
+    # branches = list "odoo/<branch_name>" or "enterprise/<branch_name>"
     if branches:
         branches = [b.split("/") for b in branches]
         odoo_branches = [b for a, b in branches if a == "odoo"]
