@@ -93,6 +93,7 @@ def cli(ctx, dbname, port, branch):
 @cli.command("prepare")
 @click.pass_obj
 def prepare_env(obj):
+    """Check out appropriate branch to worktrees (both community and enterprise)."""
     config = obj["config"]
     current_dir = os.getcwd()
 
@@ -225,32 +226,20 @@ def create_launch_json(config):
         json.dump(launch, f, indent=4)
 
 
-@cli.command("start")
-@click.option("-i", "--init", type=list, cls=OptionEatAll)
-@click.option("-u", "--update", type=list, cls=OptionEatAll)
-@click.option("-w", "--whatever", type=list, cls=OptionEatAll, save_other_options=False)
-@click.pass_obj
-def start_db(obj, init, update, whatever):
-    dbname = obj["dbname"]
-    port = obj["port"]
-    config = obj["config"]
-    try:
-        command = odoo_run_command(config, dbname, init, update, port) + list(
-            whatever or []
-        )
-        click.echo(f"Running: {' '.join(command)}\n")
-        odooproc = subprocess.Popen(command)
-        odooproc.communicate()
-    except KeyboardInterrupt:
-        odooproc.kill()
-
-
 @cli.command("init")
 @click.option("-n", "--no-demo", is_flag=True)
 @click.option("-i", "--init", type=list, cls=OptionEatAll)
-@click.option("-w", "--whatever", type=list, cls=OptionEatAll, save_other_options=False)
+@click.option(
+    "-w",
+    "--whatever",
+    type=list,
+    cls=OptionEatAll,
+    save_other_options=False,
+    help="Other options that can be passed to odoo-cli",
+)
 @click.pass_obj
 def init_db(obj, no_demo, init, whatever):
+    """Once worktrees are available, start new instance."""
     config = obj["config"]
     dbname = obj["dbname"]
     port = obj["port"]
@@ -269,10 +258,46 @@ def init_db(obj, no_demo, init, whatever):
         odooproc.kill()
 
 
+@cli.command("start")
+@click.option("-i", "--init", type=list, cls=OptionEatAll)
+@click.option("-u", "--update", type=list, cls=OptionEatAll)
+@click.option(
+    "-w",
+    "--whatever",
+    type=list,
+    cls=OptionEatAll,
+    save_other_options=False,
+    help="Other options that can be passed to odoo-cli",
+)
+@click.pass_obj
+def start_db(obj, init, update, whatever):
+    """Start an existing instance."""
+    dbname = obj["dbname"]
+    port = obj["port"]
+    config = obj["config"]
+    try:
+        command = odoo_run_command(config, dbname, init, update, port) + list(
+            whatever or []
+        )
+        click.echo(f"Running: {' '.join(command)}\n")
+        odooproc = subprocess.Popen(command)
+        odooproc.communicate()
+    except KeyboardInterrupt:
+        odooproc.kill()
+
+
 @cli.command("shell")
-@click.option("-w", "--whatever", type=list, cls=OptionEatAll, save_other_options=False)
+@click.option(
+    "-w",
+    "--whatever",
+    type=list,
+    cls=OptionEatAll,
+    save_other_options=False,
+    help="Other options that can be passed to odoo-cli.",
+)
 @click.pass_obj
 def run_odoo_shell(obj, whatever):
+    """Start a shell instance."""
     dbname = obj["dbname"]
     config = obj["config"]
     try:
@@ -288,6 +313,7 @@ def run_odoo_shell(obj, whatever):
 @click.argument("new-dbname")
 @click.pass_obj
 def copy_db(obj, new_dbname):
+    """Duplicate an existing database."""
     olddbname = obj["dbname"]
     try:
         out, err = subprocess.Popen(
@@ -312,6 +338,7 @@ def copy_db(obj, new_dbname):
 @cli.command("remove")
 @click.pass_obj
 def delete_branch(obj):
+    """Remove `prepared` branch (workstrees and workspace)."""
     config = obj["config"]
     if config["branch"] == "master":
         return
