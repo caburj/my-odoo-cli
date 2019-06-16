@@ -12,98 +12,217 @@ from .options import OptionEatAll
 HOME = Path("~").expanduser()
 
 
-class MyConfig:
-    def __init__(self):
-        raw_config = ConfigParser()
-        conf_path = (
-            HOME / ".odev" if (HOME / ".odev").is_file() else (HOME / ".my-odoo-cli")
-        )
-        raw_config.read(conf_path)
+def generate_config(branch):
+    raw_config = ConfigParser()
+    conf_path = (
+        HOME / ".odev" if (HOME / ".odev").is_file() else (HOME / ".my-odoo-cli")
+    )
+    raw_config.read(conf_path)
 
-        self.config = {}
-        python_bin = (
-            HOME
-            / "miniconda3"
-            / "envs"
-            / raw_config["DEFAULT"].get("conda-env")
-            / "bin"
-            / "python"
-        )
-        self.config["python"] = (
-            python_bin
-            if python_bin.is_file()
-            else HOME / "miniconda3" / "bin" / "python"
-        )
-        self.config["workspace-dir"] = Path(
-            raw_config["DEFAULT"].get("workspace-dir")
-        ).expanduser()
-        self.config["odoo-src"] = Path(
-            raw_config["DEFAULT"].get("odoo-src")
-        ).expanduser()
-        self.config["worktree-src"] = Path(
-            raw_config["DEFAULT"].get("worktree-src")
-        ).expanduser()
-        self.config["default-dbname"] = raw_config["DEFAULT"].get("default-dbname")
-        self.config["default-port"] = raw_config["DEFAULT"].get("default-port")
+    config = {}
+    python_bin = (
+        HOME
+        / "miniconda3"
+        / "envs"
+        / raw_config["DEFAULT"].get("conda-env")
+        / "bin"
+        / "python"
+    )
+    config["python"] = str(
+        python_bin if python_bin.is_file() else HOME / "miniconda3" / "bin" / "python"
+    )
+    config["workspace-dir"] = Path(
+        raw_config["DEFAULT"].get("workspace-dir")
+    ).expanduser()
+    config["odoo-src"] = Path(raw_config["DEFAULT"].get("odoo-src")).expanduser()
+    config["worktree-src"] = Path(
+        raw_config["DEFAULT"].get("worktree-src")
+    ).expanduser()
+    config["default-dbname"] = raw_config["DEFAULT"].get("default-dbname")
+    config["default-port"] = raw_config["DEFAULT"].get("default-port")
 
-    def __getitem__(self, name):
-        return self.config.get(name)
+    src = config["odoo-src"]
+    odoo_branch_dir = (
+        src / "odoo" if branch == "master" else config["worktree-src"] / branch / "odoo"
+    )
+    enterprise_branch_dir = (
+        src / "enterprise"
+        if branch == "master"
+        else config["worktree-src"] / branch / "enterprise"
+    )
+    config["odoo-bin"] = str(
+        (src / "odoo" if branch == "master" else odoo_branch_dir) / "odoo-bin"
+    )
 
-    def __setitem__(self, name, value):
-        self.config[name] = value
+    config["addons-path"] = [
+        str(src / "design-themes"),
+        str(enterprise_branch_dir),
+        str(odoo_branch_dir / "addons"),
+        str(odoo_branch_dir / "odoo" / "addons"),
+    ]
+    config["odoo-branch-dir"] = odoo_branch_dir
+    config["enterprise-branch-dir"] = enterprise_branch_dir
+    config["odoo-master-dir"] = src / "odoo"
+    config["enterprise-master-dir"] = src / "enterprise"
 
+    config["branch"] = branch
 
-CONFIG = MyConfig()
+    return config
 
 
 @click.group()
 @click.option("-d", "--dbname", default="testdb", show_default=True)
-@click.option("-p", "--port", default="8070")
-@click.option("-ob", "--odoo-branch", default="master")
-@click.option("-eb", "--enterprise-branch", default="master")
+@click.option("-p", "--port", default="8070", show_default=True)
+@click.option("-b", "--branch", default="master", show_default=True)
 @click.pass_context
-def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
+def cli(ctx, dbname, port, branch):
     """
     My personal odoo dev commands in the terminal.
     """
     if ctx.obj is None:
         ctx.obj = defaultdict(str)
 
-    global CONFIG
-    src = CONFIG["odoo-src"]
-    worktree_src = CONFIG["worktree-src"]
-    odoo_branch_dir = (
-        src / "odoo" if odoo_branch == "master" else worktree_src / "odoo" / odoo_branch
-    )
-    enterprise_branch_dir = (
-        src / "enterprise"
-        if enterprise_branch == "master"
-        else worktree_src / "enterprise" / enterprise_branch
-    )
-    CONFIG["odoo-bin"] = str(
-        (src / "odoo" if odoo_branch == "master" else odoo_branch_dir) / "odoo-bin"
-    )
+    config = generate_config(branch)
 
-    CONFIG["addons-path"] = [
-        str(src / "design-themes"),
-        str(enterprise_branch_dir),
-        str(odoo_branch_dir / "addons"),
-        str(odoo_branch_dir / "odoo" / "addons"),
+    ctx.obj["dbname"] = config["default-dbname"] or dbname
+    ctx.obj["port"] = config["default-port"] or port
+    ctx.obj["branch"] = branch
+    ctx.obj["config"] = config
+
+
+@cli.command("prepare")
+@click.pass_obj
+def prepare_env(obj):
+    config = obj["config"]
+    current_dir = os.getcwd()
+
+    os.chdir(config["odoo-master-dir"])
+    if config["branch"] != "master":
+        if not try_checkout_odoo_branch(config):
+            create_new_odoo_branch(config)
+
+    os.chdir(config["enterprise-master-dir"])
+    if config["branch"] != "master":
+        if not try_checkout_enterprise_branch(config):
+            create_new_enterprise_branch(config)
+
+    create_workspace(config)
+    create_launch_json(config)
+    os.chdir(current_dir)
+
+
+def try_checkout_odoo_branch(config):
+    command = [
+        "git",
+        "worktree",
+        "add",
+        "--checkout",
+        str(config["odoo-branch-dir"]),
+        config["branch"],
     ]
-    CONFIG["odoo-branch"] = odoo_branch
-    CONFIG["enterprise-branch"] = enterprise_branch
+    out, err = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    successful = not ("fatal: invalid reference" in err.decode("utf-8"))
+    return successful
 
-    if not odoo_branch_dir.exists():
-        create_odoo_worktree()
-        create_odoo_workspace()
-        create_launch_json()
-    if not enterprise_branch_dir.exists():
-        create_enterprise_worktree()
-        create_enterprise_workspace()
-        create_launch_json()
 
-    ctx.obj["dbname"] = CONFIG["default-dbname"] or dbname
-    ctx.obj["port"] = CONFIG["default-port"] or port
+def create_new_odoo_branch(config):
+    command = [
+        "git",
+        "worktree",
+        "add",
+        "-b",
+        config["branch"],
+        str(config["odoo-branch-dir"]),
+    ]
+    out, err = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if out:
+        click.echo(out.decode("utf-8"))
+    if err:
+        click.echo(err.decode("utf-8"))
+
+
+def try_checkout_enterprise_branch(config):
+    command = [
+        "git",
+        "worktree",
+        "add",
+        "--checkout",
+        str(config["enterprise-branch-dir"]),
+        config["branch"],
+    ]
+    out, err = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    successful = not ("fatal: invalid reference" in err.decode("utf-8"))
+    return successful
+
+
+def create_new_enterprise_branch(config):
+    command = [
+        "git",
+        "worktree",
+        "add",
+        "-b",
+        config["branch"],
+        str(config["enterprise-branch-dir"]),
+    ]
+    out, err = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if out:
+        click.echo(out.decode("utf-8"))
+    if err:
+        click.echo(err.decode("utf-8"))
+
+
+def create_workspace(config):
+    branch = config["branch"]
+    if branch == "master":
+        return
+
+    workspace = {
+        "folders": [
+            {"path": str(config["odoo-branch-dir"])},
+            {"path": str(config["enterprise-branch-dir"])},
+            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
+        ]
+    }
+    workspace_dir = config["workspace-dir"]
+    if not workspace_dir.exists():
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+    with open(workspace_dir / f"{branch}.code-workspace", "w+") as f:
+        json.dump(workspace, f, indent=4)
+
+
+def create_launch_json(config):
+    addons = config["addons-path"]
+    command = (
+        [f"--addons-path={','.join(addons)}"]
+        + ["-d", config["default-dbname"]]
+        + ["--xmlrpc-port", config["default-port"]]
+    )
+    launch = {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "odoo-bin",
+                "type": "python",
+                "request": "launch",
+                "program": "${workspaceFolder}/odoo-bin",
+                "console": "integratedTerminal",
+                "args": command,
+            }
+        ],
+    }
+    vscode_dir = config["odoo-branch-dir"] / ".vscode"
+    if not vscode_dir.exists():
+        vscode_dir.mkdir(parents=True, exist_ok=True)
+    with open(vscode_dir / f"launch.json", "w+") as f:
+        json.dump(launch, f, indent=4)
 
 
 @cli.command("start")
@@ -114,8 +233,9 @@ def cli(ctx, dbname, port, odoo_branch, enterprise_branch):
 def start_db(obj, init, update, whatever):
     dbname = obj["dbname"]
     port = obj["port"]
+    config = obj["config"]
     try:
-        command = odoo_run_command(CONFIG, dbname, init, update, port) + list(
+        command = odoo_run_command(config, dbname, init, update, port) + list(
             whatever or []
         )
         click.echo(f"Running: {' '.join(command)}\n")
@@ -125,12 +245,13 @@ def start_db(obj, init, update, whatever):
         odooproc.kill()
 
 
-@cli.command("new")
+@cli.command("init")
 @click.option("-n", "--no-demo", is_flag=True)
 @click.option("-i", "--init", type=list, cls=OptionEatAll)
 @click.option("-w", "--whatever", type=list, cls=OptionEatAll, save_other_options=False)
 @click.pass_obj
-def new_db(obj, no_demo, init, whatever):
+def init_db(obj, no_demo, init, whatever):
+    config = obj["config"]
     dbname = obj["dbname"]
     port = obj["port"]
     try:
@@ -138,7 +259,7 @@ def new_db(obj, no_demo, init, whatever):
             dropdb_command(dbname), stderr=subprocess.PIPE, stdout=subprocess.PIPE
         ).communicate()
         click.echo((out or err).decode("utf-8") or f"{dbname} dropped.\n")
-        command = init_db_command(CONFIG, dbname, init, no_demo, port) + list(
+        command = init_db_command(config, dbname, init, no_demo, port) + list(
             whatever or []
         )
         click.echo(f"Running: {' '.join(command)}\n")
@@ -153,8 +274,9 @@ def new_db(obj, no_demo, init, whatever):
 @click.pass_obj
 def run_odoo_shell(obj, whatever):
     dbname = obj["dbname"]
+    config = obj["config"]
     try:
-        command = odoo_shell_command(CONFIG, dbname) + list(whatever or [])
+        command = odoo_shell_command(config, dbname) + list(whatever or [])
         click.echo(f"Running: {' '.join(command)}\n")
         odooproc = subprocess.Popen(command)
         odooproc.communicate()
@@ -184,41 +306,86 @@ def copy_db(obj, new_dbname):
         odooproc.kill()
 
 
-@cli.command("delete-branch")
-@click.option(
-    "-b",
-    "--branches",
-    type=list,
-    cls=OptionEatAll,
-    help='branches = list "odoo/<branch_name>" or "enterprise/<branch_name>"',
-)
-@click.pass_obj
-def delete_branch(obj, branches):
-    # branches = list "odoo/<branch_name>" or "enterprise/<branch_name>"
-    if branches:
-        branches = [b.split("/") for b in branches]
-        odoo_branches = [b for a, b in branches if a == "odoo"]
-        enterprise_branches = [b for a, b in branches if a == "enterprise"]
-    else:
-        branches = []
-        odoo_branches = []
-        enterprise_branches = []
-    if CONFIG["odoo-branch"] != "master":
-        odoo_branches.append(CONFIG["odoo-branch"])
-    if CONFIG["enterprise-branch"] != "master":
-        enterprise_branches.append(CONFIG["enterprise-branch"])
-    for branch in odoo_branches:
-        delete_odoo_worktree_and_branch(branch)
+## REMOVE
 
-    for branch in enterprise_branches:
-        delete_enterprise_worktree_and_branch(branch)
+
+@cli.command("remove")
+@click.pass_obj
+def delete_branch(obj):
+    config = obj["config"]
+    if config["branch"] == "master":
+        return
+    delete_odoo_worktree_and_branch(config)
+    delete_enterprise_worktree_and_branch(config)
+    delete_branch_dir(config)
+
+
+def delete_odoo_worktree_and_branch(config):
+    branch = config["branch"]
+    current_dir = os.getcwd()
+    os.chdir(config["odoo-master-dir"])
+
+    remove_dir_command = ["rm", "-rf", str(config["odoo-branch-dir"])]
+    prune_worktree_command = ["git", "worktree", "prune"]
+    delete_branch_command = ["git", "branch", "-d", branch]
+    delete_workspace_command = [
+        "rm",
+        str(config["workspace-dir"] / f"{branch}.code-workspace"),
+    ]
+
+    for command in [
+        remove_dir_command,
+        prune_worktree_command,
+        delete_branch_command,
+        delete_workspace_command,
+    ]:
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
+        if out:
+            click.echo(out.decode("utf-8"))
+        if err:
+            click.echo(err.decode("utf-8"), err=True)
+
+    os.chdir(current_dir)
+
+
+def delete_enterprise_worktree_and_branch(config):
+    branch = config["branch"]
+    current_dir = os.getcwd()
+    os.chdir(config["enterprise-master-dir"])
+
+    remove_dir_command = ["rm", "-rf", str(config["enterprise-branch-dir"])]
+    prune_worktree_command = ["git", "worktree", "prune"]
+    delete_branch_command = ["git", "branch", "-d", branch]
+    for command in [remove_dir_command, prune_worktree_command, delete_branch_command]:
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
+        if out:
+            click.echo(out.decode("utf-8"))
+        if err:
+            click.echo(err.decode("utf-8"), err=True)
+    os.chdir(current_dir)
+
+
+def delete_branch_dir(config):
+    branch = config["branch"]
+    command = ["rm", "-rf", str(config["worktree-src"] / branch)]
+    out, err = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if out:
+        click.echo(out.decode("utf-8"))
+    if err:
+        click.echo(err.decode("utf-8"), err=True)
 
 
 # UTILITY FUNCTIONS
 
 
 def init_db_command(config, dbname, init, no_demo, port):
-    python = str(config["python"])
+    python = config["python"]
     odoobin = config["odoo-bin"]
     addons = config["addons-path"]
     command = (
@@ -233,7 +400,7 @@ def init_db_command(config, dbname, init, no_demo, port):
 
 
 def odoo_shell_command(config, dbname):
-    python = str(config["python"])
+    python = config["python"]
     odoobin = config["odoo-bin"]
     addons = config["addons-path"]
     command = (
@@ -245,7 +412,7 @@ def odoo_shell_command(config, dbname):
 
 
 def odoo_run_command(config, dbname, init, update, port):
-    python = str(config["python"])
+    python = config["python"]
     odoobin = config["odoo-bin"]
     addons = config["addons-path"]
     command = (
@@ -267,203 +434,3 @@ def dropdb_command(dbname):
 def copydb_command(olddbname, newdbname):
     command = ["createdb", "-O", os.environ.get("USER"), "-T", olddbname, newdbname]
     return command
-
-
-def create_odoo_worktree():
-    branch_name = CONFIG["odoo-branch"]
-    odoo_dir = CONFIG["odoo-src"] / "odoo"
-    worktree_src = CONFIG["worktree-src"]
-    current_dir = os.getcwd()
-    os.chdir(odoo_dir.expanduser())
-    command1 = [
-        "git",
-        "worktree",
-        "add",
-        "--checkout",
-        str(worktree_src / "odoo" / branch_name),
-        branch_name,
-    ]
-    command2 = [
-        "git",
-        "worktree",
-        "add",
-        "-b",
-        branch_name,
-        str(worktree_src / "odoo" / branch_name),
-    ]
-    out, err = subprocess.Popen(
-        command1, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ).communicate()
-    if 'fatal: invalid reference' in err.decode("utf-8"):
-        click.echo(
-            f"Unable to checkout remote branch: `{branch_name}`. Creating a new branch now for the worktree...",
-            err=True,
-        )
-        out, err = subprocess.Popen(
-            command2, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        ).communicate()
-    if out:
-        click.echo(out.decode("utf-8"))
-    if err:
-        click.echo(err.decode("utf-8"), err=True)
-    os.chdir(current_dir)
-
-
-def create_enterprise_worktree():
-    branch_name = CONFIG["enterprise-branch"]
-    enterprise_dir = CONFIG["odoo-src"] / "enterprise"
-    worktree_src = CONFIG["worktree-src"]
-    current_dir = os.getcwd()
-    os.chdir(enterprise_dir.expanduser())
-    command1 = [
-        "git",
-        "worktree",
-        "add",
-        "--checkout",
-        str(worktree_src / "enterprise" / branch_name),
-        branch_name,
-    ]
-    command2 = [
-        "git",
-        "worktree",
-        "add",
-        "-b",
-        branch_name,
-        str(worktree_src / "enterprise" / branch_name),
-    ]
-    out, err = subprocess.Popen(
-        command1, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ).communicate()
-    if 'fatal: invalid reference' in err.decode("utf-8"):
-        click.echo(
-            f"Unable to checkout remote branch: `{branch_name}`. Creating a new branch now for the worktree...",
-            err=True,
-        )
-        out, err = subprocess.Popen(
-            command2, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        ).communicate()
-    if out:
-        click.echo(out.decode("utf-8"))
-    if err:
-        click.echo(err.decode("utf-8"), err=True)
-    os.chdir(current_dir)
-
-
-def delete_odoo_worktree_and_branch(branch):
-    odoo_dir = CONFIG["odoo-src"] / "odoo"
-    worktree_src = CONFIG["worktree-src"]
-    current_dir = os.getcwd()
-    remove_dir_command = ["rm", "-rf", str(worktree_src / "odoo" / branch)]
-    delete_branch_command = ["git", "branch", "-d", branch]
-    prune_worktree_command = ["git", "worktree", "prune"]
-    delete_workspace_command = [
-        "rm",
-        str(CONFIG["workspace-dir"] / f"odoo-{branch}.code-workspace"),
-    ]
-    os.chdir(odoo_dir)
-    for command in [
-        remove_dir_command,
-        prune_worktree_command,
-        delete_branch_command,
-        delete_workspace_command,
-    ]:
-        out, err = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        ).communicate()
-        if out:
-            click.echo(out.decode("utf-8"))
-        if err:
-            click.echo(err.decode("utf-8"), err=True)
-    os.chdir(current_dir)
-
-
-def delete_enterprise_worktree_and_branch(branch):
-    enterprise_dir = CONFIG["odoo-src"] / "enterprise"
-    worktree_src = CONFIG["worktree-src"]
-    current_dir = os.getcwd()
-    remove_dir_command = ["rm", "-rf", str(worktree_src / "enterprise" / branch)]
-    delete_branch_command = ["git", "branch", "-d", branch]
-    prune_worktree_command = ["git", "worktree", "prune"]
-    delete_workspace_command = [
-        "rm",
-        str(CONFIG["workspace-dir"] / f"enterprise-{branch}.code-workspace"),
-    ]
-    os.chdir(enterprise_dir)
-    for command in [
-        remove_dir_command,
-        prune_worktree_command,
-        delete_branch_command,
-        delete_workspace_command,
-    ]:
-        out, err = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        ).communicate()
-        if out:
-            click.echo(out.decode("utf-8"))
-        if err:
-            click.echo(err.decode("utf-8"), err=True)
-    os.chdir(current_dir)
-
-
-def create_odoo_workspace():
-    branch = CONFIG["odoo-branch"]
-    workspace = {
-        "folders": [
-            {"path": str(CONFIG["worktree-src"] / "odoo" / branch)},
-            {"path": "/home/joseph/Projects/odoo-dev/src/enterprise"},
-            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
-        ]
-    }
-    workspace_dir = CONFIG["workspace-dir"]
-    if not workspace_dir.exists():
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-    with open(workspace_dir / f"odoo-{branch}.code-workspace", "w+") as f:
-        json.dump(workspace, f, indent=4)
-
-
-def create_enterprise_workspace():
-    branch = CONFIG["enterprise-branch"]
-    workspace = {
-        "folders": [
-            {"path": "/home/joseph/Projects/odoo-dev/src/odoo"},
-            {"path": str(CONFIG["worktree-src"] / "enterprise" / branch)},
-            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
-        ]
-    }
-    workspace_dir = CONFIG["workspace-dir"]
-    if not workspace_dir.exists():
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-    with open(workspace_dir / f"enterprise-{branch}.code-workspace", "w+") as f:
-        json.dump(workspace, f)
-
-
-def create_launch_json():
-    branch = CONFIG["odoo-branch"]
-    python = CONFIG["python"]
-    odoobin = CONFIG["odoo-bin"]
-    addons = CONFIG["addons-path"]
-    command = (
-        [f"--addons-path={','.join(addons)}"]
-        + ["-d", "testdb"]
-        + ["--xmlrpc-port", "8070"]
-    )
-    launch = {
-        "version": "0.2.0",
-        "configurations": [
-            {
-                "name": "odoo-bin",
-                "type": "python",
-                "request": "launch",
-                "program": "${workspaceFolder}/odoo-bin",
-                "console": "integratedTerminal",
-                "args": command,
-            }
-        ],
-    }
-
-    vscode_dir = CONFIG["worktree-src"] / "odoo" / branch / ".vscode"
-    if not vscode_dir.exists():
-        vscode_dir.mkdir(parents=True, exist_ok=True)
-
-    with open(vscode_dir / f"launch.json", "w+") as f:
-        json.dump(launch, f, indent=4)
