@@ -124,6 +124,17 @@ def try_checkout_odoo_branch(config):
     out, err = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ).communicate()
+    if 'already exists' in err.decode('utf-8'):
+        command = [
+            "git",
+            "worktree",
+            "add",
+            str(config["odoo-branch-dir"]),
+            config["branch"],
+        ]
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
     successful = not ("fatal: invalid reference" in err.decode("utf-8"))
     return successful
 
@@ -158,6 +169,17 @@ def try_checkout_enterprise_branch(config):
     out, err = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ).communicate()
+    if 'already exists' in err.decode('utf-8'):
+        command = [
+            "git",
+            "worktree",
+            "add",
+            str(config["odoo-branch-dir"]),
+            config["branch"],
+        ]
+        out, err = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
     successful = not ("fatal: invalid reference" in err.decode("utf-8"))
     return successful
 
