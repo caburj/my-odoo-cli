@@ -481,3 +481,31 @@ def dropdb_command(dbname):
 def copydb_command(olddbname, newdbname):
     command = ["createdb", "-O", os.environ.get("USER"), "-T", olddbname, newdbname]
     return command
+
+
+@cli.command("cd")
+@click.argument("repo")
+@click.pass_obj
+def change_dir(obj, repo):
+    config = obj["config"]
+    branch = obj["branch"]
+    try_change = repo in ["odoo", "o", "enterprise", "e"]
+    if branch == "master":
+        if repo in ["odoo", "o"]:
+            directory = config["odoo-master-dir"]
+        elif repo in ["enterprise", "e"]:
+            directory = config["enterprise-master-dir"]
+    else:
+        if repo in ["odoo", "o"]:
+            directory = config["odoo-branch-dir"]
+        elif repo in ["enterprise", "e"]:
+            directory = config["enterprise-branch-dir"]
+    if try_change:
+        if directory.exists():
+            if str(directory) != os.getcwd():
+                os.chdir(str(directory))
+                os.system("/bin/zsh")
+        else:
+            click.echo(f"`{branch}` is not yet checked out.", err=True)
+    else:
+        click.echo("repo can only be `odoo` or `enterprise`.", err=True)

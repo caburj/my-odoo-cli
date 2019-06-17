@@ -49,7 +49,24 @@
     worktree-dir/<branch>/enterprise
     ```
 
+* [X] ~~*Navigating thru the odoo worktrees*~~ [2019-06-17]
+    ```
+    // cd to src/odoo dir
+    $ odev cd odoo
+    $ odev cd enterprise
+    // cd to branch worktree
+    $ odev -b master-jcb cd odoo
+    $ odev -b master-jcb cd enterprise
+    ```
+
 
 # Proposed Features
 
 This app is about odoo development workflow.
+* [ ] --branch/-b option in the subcommands to override the specified branch in main command.
+    ```
+    // will checkout odoo master worktree instead of master-jcb
+    $ odev -b master-jcb cd odoo -b master
+    // will start instance using the master branch instead of master-jcb
+    $ odev -b master-jcb start -b master
+    ```
