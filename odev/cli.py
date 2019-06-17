@@ -55,7 +55,7 @@ def generate_config(branch):
     )
 
     config["addons-path"] = [
-        str(src / "design-themes"),
+        # str(src / "design-themes"),
         str(enterprise_branch_dir),
         str(odoo_branch_dir / "addons"),
         str(odoo_branch_dir / "odoo" / "addons"),
@@ -189,7 +189,7 @@ def create_workspace(config):
         "folders": [
             {"path": str(config["odoo-branch-dir"])},
             {"path": str(config["enterprise-branch-dir"])},
-            {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
+            # {"path": "/home/joseph/Projects/odoo-dev/src/design-themes"},
         ]
     }
     workspace_dir = config["workspace-dir"]
