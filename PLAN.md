@@ -1,5 +1,13 @@
 # Tasks
 
+* [X] ~~*create and install jupyter kernel spec*~~ [2019-06-29]
+
+* [ ] uninstall kernelspec
+
+* [ ] automatic creation of conda env per version
+
+* [X] ~~*specify python environment or executable*~~ [2019-06-29]
+
 * [X] ~~*Use config file to set conda env, odoo src dir, worktree dir*~~ [2019-06-10]
 
 * [X] ~~*worktree interaction*~~ [2019-06-10]

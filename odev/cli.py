@@ -20,19 +20,12 @@ def generate_config(branch):
     raw_config.read(conf_path)
 
     config = {}
-    python_bin = (
-        HOME
-        / "miniconda3"
-        / "envs"
-        / raw_config["DEFAULT"].get("conda-env")
-        / "bin"
-        / "python"
-    )
-    config["python"] = str(
-        python_bin if python_bin.is_file() else HOME / "miniconda3" / "bin" / "python"
-    )
+    config["conda-env"] = raw_config["DEFAULT"].get("conda-env")
     config["workspace-dir"] = Path(
         raw_config["DEFAULT"].get("workspace-dir")
+    ).expanduser()
+    config["kernelspec-dir"] = Path(
+        raw_config["DEFAULT"].get("kernelspec-dir")
     ).expanduser()
     config["odoo-src"] = Path(raw_config["DEFAULT"].get("odoo-src")).expanduser()
     config["worktree-src"] = Path(
@@ -74,8 +67,9 @@ def generate_config(branch):
 @click.option("-d", "--dbname", default="testdb", show_default=True)
 @click.option("-p", "--port", default="8070", show_default=True)
 @click.option("-b", "--branch", default="master", show_default=True)
+@click.option("-e", "--conda-env")
 @click.pass_context
-def cli(ctx, dbname, port, branch):
+def cli(ctx, dbname, port, branch, conda_env):
     """
     My personal odoo dev commands in the terminal.
     """
@@ -84,9 +78,14 @@ def cli(ctx, dbname, port, branch):
 
     config = generate_config(branch)
 
-    ctx.obj["dbname"] = config["default-dbname"] or dbname
-    ctx.obj["port"] = config["default-port"] or port
+    ctx.obj["dbname"] = dbname or config["default-dbname"]
+    ctx.obj["port"] = port or config["default-port"]
     ctx.obj["branch"] = branch
+    conda_env = conda_env or config["conda-env"]
+    python_bin = HOME / "miniconda3" / "envs" / conda_env / "bin" / "python"
+    config["python"] = str(
+        python_bin if python_bin.is_file() else HOME / "miniconda3" / "bin" / "python"
+    )
     ctx.obj["config"] = config
 
 
@@ -329,6 +328,48 @@ def run_odoo_shell(obj, whatever):
         odooproc.kill()
 
 
+@cli.command("gen-kernelspec")
+@click.option(
+    "-w",
+    "--whatever",
+    type=list,
+    cls=OptionEatAll,
+    save_other_options=False,
+    help="Other options that can be passed to odoo-cli.",
+)
+@click.pass_obj
+def generate_kernelspec(obj, whatever):
+    """Start a shell instance."""
+    dbname = obj["dbname"]
+    config = obj["config"]
+    branch = obj["branch"]
+    try:
+        shell_command = odoo_shell_command(config, dbname, is_for_jupyter=True) + list(
+            whatever or []
+        )
+        kernelspec_dict = {
+            "argv": shell_command,
+            "display_name": f"Odoo - {branch} - {dbname}",
+            "language": "Python",
+        }
+        kernel_spec_to_install_dir = config["kernelspec-dir"] / branch / dbname
+        kernel_spec_to_install_dir.mkdir(parents=True, exist_ok=True)
+        with open(kernel_spec_to_install_dir / "kernel.json", "w+") as outfile:
+            json.dump(kernelspec_dict, outfile, indent=2)
+
+        install_kernelspec_command = [
+            "jupyter",
+            "kernelspec",
+            "install",
+            str(kernel_spec_to_install_dir),
+            "--user",
+        ]
+        proc = subprocess.Popen(install_kernelspec_command)
+        proc.communicate()
+    except KeyboardInterrupt:
+        proc.kill()
+
+
 @cli.command("copy-db")
 @click.argument("new-dbname")
 @click.pass_obj
@@ -446,7 +487,7 @@ def init_db_command(config, dbname, init, no_demo, port):
     return command
 
 
-def odoo_shell_command(config, dbname):
+def odoo_shell_command(config, dbname, is_for_jupyter=False):
     python = config["python"]
     odoobin = config["odoo-bin"]
     addons = config["addons-path"]
@@ -454,6 +495,9 @@ def odoo_shell_command(config, dbname):
         [python, odoobin, "shell"]
         + [f"--addons-path={','.join(addons)}"]
         + ["-d", dbname]
+        + ["-f", "{connection_file}"]
+        if is_for_jupyter
+        else []
     )
     return command
 
