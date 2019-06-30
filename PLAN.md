@@ -71,10 +71,16 @@
 # Proposed Features
 
 This app is about odoo development workflow.
-* [ ] --branch/-b option in the subcommands to override the specified branch in main command.
+
+
+
+# Cancelled
+
+* [X] ~~*--branch/-b option in the subcommands to override the specified branch in main command.*~~ [2019-06-18]
     ```
     // will checkout odoo master worktree instead of master-jcb
     $ odev -b master-jcb cd odoo -b master
     // will start instance using the master branch instead of master-jcb
     $ odev -b master-jcb start -b master
     ```
+    - This will introduce confusion. Better to define branch in the main command.
