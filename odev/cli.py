@@ -31,7 +31,7 @@ def generate_config(branch):
     config["worktree-src"] = Path(
         raw_config["DEFAULT"].get("worktree-src")
     ).expanduser()
-    config["default-dbname"] = raw_config["DEFAULT"].get("default-dbname")
+    config["default-dbname"] = branch
     config["default-port"] = raw_config["DEFAULT"].get("default-port")
 
     src = config["odoo-src"]
@@ -64,7 +64,7 @@ def generate_config(branch):
 
 
 @click.group()
-@click.option("-d", "--dbname", default="testdb", show_default=True)
+@click.option("-d", "--dbname")
 @click.option("-p", "--port", default="8070", show_default=True)
 @click.option("-b", "--branch", default="master", show_default=True)
 @click.option("-e", "--conda-env")
@@ -78,7 +78,7 @@ def cli(ctx, dbname, port, branch, conda_env):
 
     config = generate_config(branch)
 
-    ctx.obj["dbname"] = dbname or config["default-dbname"]
+    ctx.obj["dbname"] = dbname or config.get('default-dbname') or branch
     ctx.obj["port"] = port or config["default-port"]
     ctx.obj["branch"] = branch
     conda_env = conda_env or config["conda-env"]
@@ -415,7 +415,7 @@ def delete_odoo_worktree_and_branch(config):
 
     remove_dir_command = ["rm", "-rf", str(config["odoo-branch-dir"])]
     prune_worktree_command = ["git", "worktree", "prune"]
-    delete_branch_command = ["git", "branch", "-d", branch]
+    delete_branch_command = ["git", "branch", "-D", branch]
     delete_workspace_command = [
         "rm",
         str(config["workspace-dir"] / f"{branch}.code-workspace"),
@@ -445,7 +445,7 @@ def delete_enterprise_worktree_and_branch(config):
 
     remove_dir_command = ["rm", "-rf", str(config["enterprise-branch-dir"])]
     prune_worktree_command = ["git", "worktree", "prune"]
-    delete_branch_command = ["git", "branch", "-d", branch]
+    delete_branch_command = ["git", "branch", "-D", branch]
     for command in [remove_dir_command, prune_worktree_command, delete_branch_command]:
         out, err = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
