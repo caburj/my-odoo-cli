@@ -1,5 +1,7 @@
 # Tasks
 
+* [X] ~~*make the default testdb to be based on the name of the branch*~~ [2019-08-14]
+
 * [X] ~~*create and install jupyter kernel spec*~~ [2019-06-29]
 
 * [ ] uninstall kernelspec
@@ -72,6 +74,7 @@
 
 This app is about odoo development workflow.
 
+* [ ] choose random port and mention it in the logs, or perhaps open an incognito browser
 
 
 # Cancelled
