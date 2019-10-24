@@ -12,7 +12,7 @@ from .options import OptionEatAll
 HOME = Path("~").expanduser()
 
 
-def generate_config(branch):
+def generate_config(branch, enterprise):
     raw_config = ConfigParser()
     conf_path = (
         HOME / ".odev" if (HOME / ".odev").is_file() else (HOME / ".my-odoo-cli")
@@ -47,9 +47,8 @@ def generate_config(branch):
         (src / "odoo" if branch == "master" else odoo_branch_dir) / "odoo-bin"
     )
 
-    config["addons-path"] = [
-        # str(src / "design-themes"),
-        str(enterprise_branch_dir),
+    enterprise_path = [str(enterprise_branch_dir)] if enterprise else []
+    config["addons-path"] = enterprise_path + [
         str(odoo_branch_dir / "addons"),
         str(odoo_branch_dir / "odoo" / "addons"),
     ]
@@ -68,17 +67,18 @@ def generate_config(branch):
 @click.option("-p", "--port", default="8070", show_default=True)
 @click.option("-b", "--branch", default="master", show_default=True)
 @click.option("-e", "--conda-env")
+@click.option("--enterprise/--no-enterprise", default=True)
 @click.pass_context
-def cli(ctx, dbname, port, branch, conda_env):
+def cli(ctx, dbname, port, branch, conda_env, enterprise):
     """
     My personal odoo dev commands in the terminal.
     """
     if ctx.obj is None:
         ctx.obj = defaultdict(str)
 
-    config = generate_config(branch)
+    config = generate_config(branch, enterprise)
 
-    ctx.obj["dbname"] = dbname or config.get('default-dbname') or branch
+    ctx.obj["dbname"] = dbname or config.get("default-dbname") or branch
     ctx.obj["port"] = port or config["default-port"]
     ctx.obj["branch"] = branch
     conda_env = conda_env or config["conda-env"]
@@ -495,9 +495,7 @@ def odoo_shell_command(config, dbname, is_for_jupyter=False):
         [python, odoobin, "shell"]
         + [f"--addons-path={','.join(addons)}"]
         + ["-d", dbname]
-        + ["-f", "{connection_file}"]
-        if is_for_jupyter
-        else []
+        + (["-f", "{connection_file}"] if is_for_jupyter else [])
     )
     return command
 

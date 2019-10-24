@@ -78,7 +78,7 @@ This app is about odoo development workflow.
 * [ ] I should be able to have better control when I am in the dir of the branch
     - For instance, I don't need to specify the branch in the command, it should
       default to the branch of the current directory
-
+* [ ] allow community only usage (no enterprise, also in the launch.json file for vscode)
 
 
 # Cancelled
