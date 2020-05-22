@@ -34,7 +34,7 @@ class OptionEatAll(click.Option):
             # call the actual process
             self._previous_parser_process(value, state)
 
-        retval = super(OptionEatAll, self).add_to_parser(parser, ctx)
+        super(OptionEatAll, self).add_to_parser(parser, ctx)
         for name in self.opts:
             our_parser = parser._long_opt.get(name) or parser._short_opt.get(name)
             if our_parser:
@@ -42,4 +42,4 @@ class OptionEatAll(click.Option):
                 self._previous_parser_process = our_parser.process
                 our_parser.process = parser_process
                 break
-        return retval
+        return

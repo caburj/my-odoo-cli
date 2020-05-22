@@ -10,6 +10,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        odev=odev.cli:cli
+        odev=odev.main:main
     ''',
 )

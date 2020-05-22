@@ -1,7 +1,7 @@
 [DEFAULT]
 conda-env = master
-odoo-src = ~/Projects/odoo-dev/src
-worktree-src = ~/Projects/odoo-dev/worktrees
-default-port = 8070
-workspace-dir = ~/Projects/workspaces
-kernelspec-dir = ~/Projects/kernelspecs
+src = ~/Projects/odoo-dev/src
+worktrees = ~/Projects/odoo-dev/worktrees
+workspaces = ~/Projects/workspaces
+filestore = ~/.local/share/Odoo/filestore
+port = 8070
