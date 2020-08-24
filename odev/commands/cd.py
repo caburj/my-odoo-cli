@@ -15,12 +15,12 @@ def cd(obj, name):
     if name == "src":
         if str(odoo_dir) != os.getcwd():
             os.chdir(str(odoo_dir))
-            os.system("/bin/bash")
+            os.system("/bin/zsh")
             return
 
     if odoo_worktree_dir.exists():
         if str(odoo_worktree_dir) != os.getcwd():
             os.chdir(str(odoo_worktree_dir))
-            os.system("/bin/bash")
+            os.system("/bin/zsh")
     else:
         click.echo(f"`{name}` is not yet checked out.", err=True)
