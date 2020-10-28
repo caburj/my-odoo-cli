@@ -12,12 +12,14 @@ from ..main import main
 @click.pass_obj
 def prepare(obj, new_branch, pull):
     """Check out appropriate branch to worktrees (both community and enterprise).
-    
-    NEW_BRANCH should have a name prefixed with the name of the base branch.
-        e.g. master-new-featuer, 13.0-fix-something
+
+    NEW_BRANCH should have a name prefixed with the name of the base branch
+    separated by semicolon. e.g. master:new-feature, 13.0:fix-something,
+    saas-13.4:change-tour-message
     """
     # compute base branch based on the name of the new branch
-    base_branch = new_branch.split("-")[0]
+    base_branch = new_branch.split(":")[0]
+    new_branch = new_branch.replace(":", "-")
 
     odoo_dir, odoo_worktree_dir = obj.get_dirs("odoo", new_branch)
     ent_dir, ent_worktree_dir = obj.get_dirs("enterprise", new_branch)
