@@ -10,3 +10,4 @@ from .import_ import import_
 from .listdb import listdb
 from .kill import kill
 from .select import select
+from .current import current
