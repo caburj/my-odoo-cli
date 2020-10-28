@@ -42,9 +42,15 @@ class OdevContextObject:
         except Exception:
             return self.get_current()
 
-    def get_addons(self, name, no_enterprise=False):
-        enterprise_worktree = self.worktrees / name / "enterprise"
-        odoo_worktree = self.worktrees / name / "odoo"
+    def get_addons(self, name, no_enterprise=False, from_src=False):
+        enterprise_worktree = (
+            self.worktrees / name / "enterprise"
+            if not from_src
+            else self.src / "enterprise"
+        )
+        odoo_worktree = (
+            self.worktrees / name / "odoo" if not from_src else self.src / "odoo"
+        )
         enterprise = [] if no_enterprise else [str(enterprise_worktree)]
         return ",".join(
             [
@@ -58,7 +64,9 @@ class OdevContextObject:
         _, out, _ = run(["which", "python"])
         return out.decode("utf-8").strip()
 
-    def get_odoo_bin(self, name):
+    def get_odoo_bin(self, name, from_src=False):
+        if from_src:
+            return str(self.src / "odoo" / "odoo-bin")
         return str(self.worktrees / name / "odoo" / "odoo-bin")
 
     def init_db(self, name, dbname, modules=None, no_demo=None):

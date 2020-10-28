@@ -1,4 +1,5 @@
 import click
+import os
 
 from ..utils import run, db_exists, identify_current
 from ..main import main
@@ -11,11 +12,12 @@ from odev.options import OptionEatAll
 @click.option("-t", "--test-tags")
 @click.option("-i", "--install-modules")
 @click.option("-u", "--update-modules")
-@click.option("-d", "--dbsuffix")
+@click.option("-s", "--suffix")
 @click.option("-b", "--basedb")
 @click.option("-ne", "--no-enterprise", is_flag=True, default=False)
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--fresh", is_flag=True, default=False)
+@click.option("--from-src", is_flag=True, default=False)
 @click.option(
     "-w",
     "--whatever",
@@ -34,35 +36,36 @@ def test(
     test_tags,
     install_modules,
     update_modules,
-    dbsuffix,
+    suffix,
     basedb,
     no_enterprise,
     debug,
     fresh,
+    from_src,
     whatever,
 ):
-    dbsuffix = f"{name}{f'-{dbsuffix}' if dbsuffix else ''}"
+    suffix = f"{name}{f'-{suffix}' if suffix else ''}"
     basedb = f"{name}-{basedb if basedb else 'basedb'}"
 
     if fresh:
-        run(obj.dropdb(dbsuffix))
-        run(obj.drop_filestore(dbsuffix))
-        run(obj.copydb(basedb, dbsuffix))
-        run(obj.copy_filestore(basedb, dbsuffix))
-    elif not db_exists(dbsuffix):
-        run(obj.copydb(basedb, dbsuffix))
-        run(obj.copy_filestore(basedb, dbsuffix))
+        run(obj.dropdb(suffix))
+        run(obj.drop_filestore(suffix))
+        run(obj.copydb(basedb, suffix))
+        run(obj.copy_filestore(basedb, suffix))
+    elif not db_exists(suffix):
+        run(obj.copydb(basedb, suffix))
+        run(obj.copy_filestore(basedb, suffix))
 
     python = obj.get_python()
-    odoobin = obj.get_odoo_bin(name)
-    addons = obj.get_addons(name, no_enterprise)
+    odoobin = obj.get_odoo_bin(name, from_src)
+    addons = obj.get_addons(name, no_enterprise, from_src)
     command = [
         python,
         odoobin,
         "--addons-path",
         addons,
         "-d",
-        dbsuffix,
+        suffix,
         "--stop-after-init",
     ]
 
@@ -79,4 +82,9 @@ def test(
 
     command += whatever
 
+    if from_src:
+        os.chdir(str(obj.src / "odoo"))
+        run(["git", "checkout", name])
+        os.chdir(str(obj.src / "enterprise"))
+        run(["git", "checkout", name])
     run(command, verbose=True)
