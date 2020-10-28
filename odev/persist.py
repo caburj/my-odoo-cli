@@ -27,7 +27,7 @@ def remove(key):
         obj = json.load(rfile) or dict()
 
     with open(jsonfile, "w") as file:
-        obj[key] = False 
+        obj[key] = False
         json.dump(obj, file)
 
 

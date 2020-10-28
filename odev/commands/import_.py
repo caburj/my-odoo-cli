@@ -10,7 +10,7 @@ from ..main import main
 
 @main.command("import")
 @click.argument("name", required=False)
-@click.argument("zipfile", type=click.Path(exists=True))
+@click.option("-z", "--zipfile", type=click.Path(exists=True))
 @click.option("-s", "--suffix")
 @click.pass_obj
 @identify_current
