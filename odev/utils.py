@@ -97,6 +97,9 @@ class OdevContextObject:
             str(self.filestore / newdbname),
         ]
 
+    def get_workspace_dir(self, base_branch):
+        return str(self.workspaces / f"{base_branch}.code-workspace")
+
 
 def run(command, verbose=False):
     str_command = f"{' '.join(command)}"
@@ -170,7 +173,7 @@ def get_base_branch(name):
     <real-base>:<base if real-base is not present>-name
     returns base, name
     """
-    splitted_with_colon = name.split(':')
+    splitted_with_colon = name.split(":")
     if len(splitted_with_colon) == 2:
         return splitted_with_colon[0], splitted_with_colon[1]
     splitted_name = name.split("-")

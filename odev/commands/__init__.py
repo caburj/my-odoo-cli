@@ -11,3 +11,4 @@ from .listdb import listdb
 from .kill import kill
 from .select import select
 from .current import current
+from .code import code

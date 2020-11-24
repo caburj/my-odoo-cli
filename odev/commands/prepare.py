@@ -11,8 +11,9 @@ from ..main import main
 @click.argument("new-branch")
 @click.option("-p", "--pull", is_flag=True, default=False)
 @click.option("-r", "--from-remote", is_flag=True, default=False)
+@click.option("-o", "--open-workspace", is_flag=True, default=True)
 @click.pass_obj
-def prepare(obj, new_branch, pull, from_remote):
+def prepare(obj, new_branch, pull, from_remote, open_workspace):
     """Check out appropriate branch to worktrees (both community and enterprise).
 
     NEW_BRANCH should have a name prefixed with the name of the base branch
@@ -30,8 +31,11 @@ def prepare(obj, new_branch, pull, from_remote):
     create_branch(base_branch, new_branch, ent_base_worktree_dir, pull, from_remote)
     create_upgrade_branch(new_branch, up_dir, pull, from_remote)
 
-    add_to_list('all', original_name)
+    add_to_list("all", original_name)
     obj.set_current(original_name)
+
+    if open_workspace:
+        run(["odev", "code"])
 
 
 @return_to_cwd

@@ -8,8 +8,9 @@ from ..utils import run, get_base_branch, return_to_cwd
 @main.command("select")
 @click.option("-s", "--search-string")
 @click.option("-i", "--index", default=0)
+@click.option("-o", "--open-workspace", is_flag=True, default=True)
 @click.pass_obj
-def select(obj, search_string, index=0):
+def select(obj, search_string, index, open_workspace):
     branches = obj.list_branches(search_string)
     if len(branches) == 0:
         click.echo(f"No result for '{search_string}'.")
@@ -31,6 +32,10 @@ def select(obj, search_string, index=0):
     normal_checkout(odoo_worktree_dir, selected)
     normal_checkout(ent_worktree_dir, selected)
     normal_checkout(upgrade_dir, selected)
+
+    if open_workspace:
+        run(["odev", "code"])
+
 
 @return_to_cwd
 def normal_checkout(src_dir, branch):
