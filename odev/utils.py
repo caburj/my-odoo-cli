@@ -25,7 +25,9 @@ class OdevContextObject:
         persist.save("current", name)
 
     def remove_current(self):
+        current = self.get_current()
         persist.remove("current")
+        persist.remove_from_list("all", current)
 
     def get_current(self):
         return persist.get("current")
@@ -33,24 +35,14 @@ class OdevContextObject:
     def get_dirs(self, repo, branch):
         return (self.src / repo, self.worktrees / branch / repo)
 
+    # TODO perhaps we only allow current for the moment
     def identify_name(self):
-        cwd = os.getcwd()
-        try:
-            return re.match(
-                f"({str(self.worktrees)})/(.*)/((odoo|enterprise).*)", cwd
-            ).group(2)
-        except Exception:
-            return self.get_current()
+        return self.get_current()
 
-    def get_addons(self, name, no_enterprise=False, from_src=False):
-        enterprise_worktree = (
-            self.worktrees / name / "enterprise"
-            if not from_src
-            else self.src / "enterprise"
-        )
-        odoo_worktree = (
-            self.worktrees / name / "odoo" if not from_src else self.src / "odoo"
-        )
+    def get_addons(self, name, no_enterprise=False):
+        base_branch, _ = get_base_branch(name)
+        enterprise_worktree = self.worktrees / base_branch / "enterprise"
+        odoo_worktree = self.worktrees / base_branch / "odoo"
         enterprise = [] if no_enterprise else [str(enterprise_worktree)]
         return ",".join(
             [
@@ -64,10 +56,9 @@ class OdevContextObject:
         _, out, _ = run(["which", "python"])
         return out.decode("utf-8").strip()
 
-    def get_odoo_bin(self, name, from_src=False):
-        if from_src:
-            return str(self.src / "odoo" / "odoo-bin")
-        return str(self.worktrees / name / "odoo" / "odoo-bin")
+    def get_odoo_bin(self, name):
+        base_branch, _ = get_base_branch(name)
+        return str(self.worktrees / base_branch / "odoo" / "odoo-bin")
 
     def init_db(self, name, dbname, modules=None, no_demo=None):
         python = self.get_python()
@@ -82,12 +73,11 @@ class OdevContextObject:
         )
         return command
 
-    def list_worktrees(self, search_string=False):
+    def list_branches(self, search_string=False):
         return [
-            dI
-            for dI in os.listdir(str(self.worktrees))
-            if os.path.isdir(os.path.join(str(self.worktrees), dI))
-            if (search_string or "") in dI
+            branch_name
+            for branch_name in persist.get("all")
+            if (search_string or "") in branch_name
         ]
 
     def dropdb(self, dbname):
@@ -173,3 +163,18 @@ def identify_current(func):
         return result
 
     return wrapped
+
+
+def get_base_branch(name):
+    """
+    <real-base>:<base if real-base is not present>-name
+    returns base, name
+    """
+    splitted_with_colon = name.split(':')
+    if len(splitted_with_colon) == 2:
+        return splitted_with_colon[0], splitted_with_colon[1]
+    splitted_name = name.split("-")
+    first = splitted_name[0]
+    if first == "saas":
+        return f"{first}-{splitted_name[1]}", name
+    return first, name

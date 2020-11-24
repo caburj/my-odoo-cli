@@ -7,7 +7,7 @@ from ..main import main
 @click.option("-s", "--search-string")
 @click.pass_obj
 def list_(obj, search_string):
-    worktrees = obj.list_worktrees(search_string)
+    worktrees = obj.list_branches(search_string)
     current = obj.get_current()
     for i, worktree in enumerate(worktrees):
         marker = "*" if worktree == current else ""

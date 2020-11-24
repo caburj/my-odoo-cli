@@ -18,7 +18,6 @@ from odev.options import OptionEatAll
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--fresh", is_flag=True, default=False)
 @click.option("--shell", is_flag=True, default=False)
-@click.option("--from-src", is_flag=True, default=False)
 @click.option(
     "-w",
     "--whatever",
@@ -43,7 +42,6 @@ def start(
     debug,
     fresh,
     shell,
-    from_src,
     whatever,
 ):
     suffix = f"{name}{f'-{suffix}' if suffix else ''}"
@@ -59,8 +57,8 @@ def start(
         run(obj.copy_filestore(basedb, suffix))
 
     python = obj.get_python()
-    odoobin = obj.get_odoo_bin(name, from_src)
-    addons = obj.get_addons(name, no_enterprise, from_src)
+    odoobin = obj.get_odoo_bin(name)
+    addons = obj.get_addons(name, no_enterprise)
     command = [python, odoobin]
 
     if shell:
@@ -79,9 +77,4 @@ def start(
 
     command += whatever
 
-    if from_src:
-        os.chdir(str(obj.src / "odoo"))
-        run(["git", "checkout", name])
-        os.chdir(str(obj.src / "enterprise"))
-        run(["git", "checkout", name])
     run(command, verbose=True)

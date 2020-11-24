@@ -1,7 +1,7 @@
 import click
 import os
 
-from ..utils import run, HOME, identify_current
+from ..utils import run, HOME, identify_current, get_base_branch
 from ..main import main
 
 
@@ -11,26 +11,20 @@ from ..main import main
 @click.pass_obj
 @identify_current
 def remove(obj, name, drop_dbs):
-    odoo_dir, _ = obj.get_dirs("odoo", name)
-    enterprise_dir, _ = obj.get_dirs("enterprise", name)
-    upgrade_dir, _ = obj.get_dirs("upgrade", name)
+    base_branch, name = get_base_branch(name)
+    _, odoo_base_worktree_dir = obj.get_dirs("odoo", base_branch)
+    _, ent_base_worktree_dir = obj.get_dirs("enterprise", base_branch)
+    upgrade_dir, _ = obj.get_dirs("upgrade", base_branch)
 
-    delete_worktrees(name, obj.workspaces, obj.worktrees)
-    delete_branch(name, odoo_dir)
-    delete_branch(name, enterprise_dir)
-    delete_branch(name, upgrade_dir)
+    delete_branch(name, odoo_base_worktree_dir, base_branch)
+    delete_branch(name, ent_base_worktree_dir, base_branch)
+    delete_branch(name, upgrade_dir, base_branch="master")
     if drop_dbs:
         run(["odev", "drop", name, "--all"])
     obj.remove_current()
 
 
-def delete_worktrees(name, workspaces, worktrees):
-    os.chdir(str(HOME))
-    run(["rm", "-rf", str(worktrees / name)])
-    run(["rm", str(workspaces / f"{name}.code-workspace")])
-
-
-def delete_branch(name, repo_dir):
+def delete_branch(name, repo_dir, base_branch):
     os.chdir(repo_dir)
-    run(["git", "worktree", "prune"])
+    run(["git", "checkout", base_branch])
     run(["git", "branch", "-D", name])
