@@ -8,7 +8,7 @@ from ..utils import run, get_base_branch, return_to_cwd
 @main.command("select")
 @click.option("-s", "--search-string")
 @click.option("-i", "--index", default=0)
-@click.option("-o", "--open-workspace", is_flag=True, default=True)
+@click.option("-o", "--open-workspace", is_flag=True, default=False)
 @click.pass_obj
 def select(obj, search_string, index, open_workspace):
     branches = obj.list_branches(search_string)

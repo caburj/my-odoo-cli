@@ -16,6 +16,7 @@ class OdevContextObject:
         config = ConfigParser()
         config.read(HOME / ".odev")
         self.src = Path(config["DEFAULT"].get("src")).expanduser()
+        self.my_odoo_addons_dir = HOME / "Projects" / "odoo-personal-addons"
         self.worktrees = Path(config["DEFAULT"].get("worktrees")).expanduser()
         self.workspaces = Path(config["DEFAULT"].get("workspaces")).expanduser()
         self.filestore = Path(config["DEFAULT"].get("filestore")).expanduser()
@@ -39,8 +40,9 @@ class OdevContextObject:
     def identify_name(self):
         return self.get_current()
 
-    def get_addons(self, name, no_enterprise=False):
-        base_branch, _ = get_base_branch(name)
+    def get_addons(self, name, no_enterprise=False, base_branch=None):
+        default_base_branch, _ = get_base_branch(name)
+        base_branch = base_branch if base_branch else default_base_branch
         enterprise_worktree = self.worktrees / base_branch / "enterprise"
         odoo_worktree = self.worktrees / base_branch / "odoo"
         enterprise = [] if no_enterprise else [str(enterprise_worktree)]
@@ -49,6 +51,7 @@ class OdevContextObject:
                 *enterprise,
                 str(odoo_worktree / "addons"),
                 str(odoo_worktree / "odoo" / "addons"),
+                str(self.my_odoo_addons_dir),
             ]
         )
 
@@ -56,8 +59,9 @@ class OdevContextObject:
         _, out, _ = run(["which", "python"])
         return out.decode("utf-8").strip()
 
-    def get_odoo_bin(self, name):
-        base_branch, _ = get_base_branch(name)
+    def get_odoo_bin(self, name, base_branch=None):
+        default_base_branch, _ = get_base_branch(name)
+        base_branch = base_branch if base_branch else default_base_branch
         return str(self.worktrees / base_branch / "odoo" / "odoo-bin")
 
     def init_db(self, name, dbname, modules=None, no_demo=None):

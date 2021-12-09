@@ -13,6 +13,7 @@ from odev.options import OptionEatAll
 @click.option("-p", "--port")
 @click.option("-s", "--suffix")
 @click.option("-b", "--basedb")
+@click.option("-W", "--base-worktree")
 @click.option("-ne", "--no-enterprise", is_flag=True, default=False)
 @click.option("-nd", "--no-demo", is_flag=True, default=False)
 @click.option("--debug", is_flag=True, default=False)
@@ -37,6 +38,7 @@ def start(
     port,
     suffix,
     basedb,
+    base_worktree,
     no_enterprise,
     no_demo,
     debug,
@@ -44,6 +46,7 @@ def start(
     shell,
     whatever,
 ):
+    name = base_worktree if base_worktree else name
     suffix = f"{name}{f'-{suffix}' if suffix else ''}"
     basedb = f"{name}-{basedb if basedb else 'basedb'}"
 
@@ -57,9 +60,14 @@ def start(
         run(obj.copy_filestore(basedb, suffix))
 
     python = obj.get_python()
-    odoobin = obj.get_odoo_bin(name)
-    addons = obj.get_addons(name, no_enterprise)
-    command = [python, odoobin]
+    odoobin = obj.get_odoo_bin(name, base_worktree)
+    addons = obj.get_addons(name, no_enterprise, base_worktree)
+    command = [python]
+
+    if debug:
+        command.extend(['-m', 'debugpy', '--listen', '5678'])
+
+    command.append(odoobin)
 
     if shell:
         command += ["shell"]

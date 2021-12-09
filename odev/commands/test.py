@@ -14,6 +14,7 @@ from odev.options import OptionEatAll
 @click.option("-u", "--update-modules")
 @click.option("-s", "--suffix")
 @click.option("-b", "--basedb")
+@click.option("-p", "--port")
 @click.option("-ne", "--no-enterprise", is_flag=True, default=False)
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--fresh", is_flag=True, default=False)
@@ -37,6 +38,7 @@ def test(
     update_modules,
     suffix,
     basedb,
+    port,
     no_enterprise,
     debug,
     fresh,
@@ -57,15 +59,22 @@ def test(
     python = obj.get_python()
     odoobin = obj.get_odoo_bin(name)
     addons = obj.get_addons(name, no_enterprise)
-    command = [
-        python,
-        odoobin,
-        "--addons-path",
-        addons,
-        "-d",
-        suffix,
-        "--stop-after-init",
-    ]
+    command = [python]
+
+    if debug:
+        command.extend(["-m", "debugpy", "--listen", "5678"])
+
+    command.extend(
+        [
+            odoobin,
+            "--addons-path",
+            addons,
+            "-d",
+            suffix,
+            "--stop-after-init",
+            "-p", port or obj.port,
+        ]
+    )
 
     if install_modules:
         command += ["-i", install_modules]

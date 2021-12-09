@@ -11,7 +11,7 @@ from ..main import main
 @click.argument("new-branch")
 @click.option("-p", "--pull", is_flag=True, default=False)
 @click.option("-r", "--from-remote", is_flag=True, default=False)
-@click.option("-o", "--open-workspace", is_flag=True, default=True)
+@click.option("-o", "--open-workspace", is_flag=True, default=False)
 @click.pass_obj
 def prepare(obj, new_branch, pull, from_remote, open_workspace):
     """Check out appropriate branch to worktrees (both community and enterprise).
