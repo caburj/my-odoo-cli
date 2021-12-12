@@ -13,10 +13,14 @@ HOME = Path("~").expanduser()
 
 class OdevContextObject:
     def __init__(self):
-        config = ConfigParser()
+        config = ConfigParser(allow_no_value=True)
         config.read(HOME / ".odev")
         self.src = Path(config["DEFAULT"].get("src")).expanduser()
-        self.my_odoo_addons_dir = HOME / "Projects" / "odoo-personal-addons"
+        custom_addons_dir = config["DEFAULT"].get("custom-addons")
+        if custom_addons_dir:
+            self.custom_addons_dir = Path(custom_addons_dir).expanduser()
+        else:
+            self.custom_addons_dir = None
         self.worktrees = Path(config["DEFAULT"].get("worktrees")).expanduser()
         self.workspaces = Path(config["DEFAULT"].get("workspaces")).expanduser()
         self.filestore = Path(config["DEFAULT"].get("filestore")).expanduser()
@@ -51,9 +55,8 @@ class OdevContextObject:
                 *enterprise,
                 str(odoo_worktree / "addons"),
                 str(odoo_worktree / "odoo" / "addons"),
-                str(self.my_odoo_addons_dir),
             ]
-        )
+        ) + ('' if not self.custom_addons_dir else f",{self.custom_addons_dir}")
 
     def get_python(self):
         _, out, _ = run(["which", "python"])

@@ -12,3 +12,4 @@ from .kill import kill
 from .select import select
 from .current import current
 from .code import code
+from .worktree import worktree

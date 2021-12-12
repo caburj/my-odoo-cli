@@ -1,6 +1,7 @@
 [DEFAULT]
 conda-env = master
 src = ~/Projects/odoo-dev/src
+custom-addons =
 worktrees = ~/Projects/odoo-dev/worktrees
 workspaces = ~/Projects/workspaces
 filestore = ~/.local/share/Odoo/filestore
