@@ -9,11 +9,12 @@ from ..main import main
 # TODO: add a way to prepare from odoo-dev remote (useful for failed forward port)
 @main.command("prepare")
 @click.argument("new-branch")
+@click.option("-b", "--base-branch")
 @click.option("-p", "--pull", is_flag=True, default=False)
 @click.option("-r", "--from-remote", is_flag=True, default=False)
 @click.option("-o", "--open-workspace", is_flag=True, default=False)
 @click.pass_obj
-def prepare(obj, new_branch, pull, from_remote, open_workspace):
+def prepare(obj, new_branch, base_branch, pull, from_remote, open_workspace):
     """Check out appropriate branch to worktrees (both community and enterprise).
 
     NEW_BRANCH should have a name prefixed with the name of the base branch
@@ -21,11 +22,15 @@ def prepare(obj, new_branch, pull, from_remote, open_workspace):
     saas-13.4-change-tour-message
     """
     original_name = new_branch
+    different_base_branch = base_branch
     base_branch, new_branch = get_base_branch(new_branch)
 
     _, odoo_base_worktree_dir = obj.get_dirs("odoo", base_branch)
     _, ent_base_worktree_dir = obj.get_dirs("enterprise", base_branch)
     up_dir, _ = obj.get_dirs("upgrade", base_branch)
+
+    if different_base_branch:
+        base_branch = different_base_branch
 
     create_branch(base_branch, new_branch, odoo_base_worktree_dir, pull, from_remote)
     create_branch(base_branch, new_branch, ent_base_worktree_dir, pull, from_remote)
