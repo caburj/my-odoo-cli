@@ -58,7 +58,11 @@ def create_upgrade_branch(new_branch, src_dir, pull, from_remote):
     run(["git", "checkout", "master"])
     if pull:
         run(["git", "pull", "origin", "master"])
-    checkout_new_branch(src_dir, new_branch, from_remote)
+    if from_remote:
+        run(["git", "fetch", "origin", new_branch])
+        run(["git", "checkout", "-t", f"origin/{new_branch}"])
+    else:
+        run(["git", "checkout", "-b", new_branch])
 
 
 def checkout_new_branch(worktree_dir, new_branch, from_remote):

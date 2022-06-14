@@ -19,6 +19,8 @@ from odev.options import OptionEatAll
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--fresh", is_flag=True, default=False)
 @click.option("--shell", is_flag=True, default=False)
+@click.option("--populate", is_flag=True, default=False)
+@click.option("-d", "--db")
 @click.option(
     "-w",
     "--whatever",
@@ -44,6 +46,8 @@ def start(
     debug,
     fresh,
     shell,
+    populate,
+    db,
     whatever,
 ):
     name = base_worktree if base_worktree else name
@@ -71,8 +75,10 @@ def start(
 
     if shell:
         command += ["shell"]
+    if populate:
+        command += ["populate"]
 
-    command += ["--addons-path", addons, "-d", suffix, "-p", port or obj.port]
+    command += ["--addons-path", addons, "-d", db or suffix, "-p", port or obj.port]
 
     if install_modules:
         command += ["-i", install_modules]
